@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>かものはし タスクAI</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Hiragino Sans','Noto Sans JP',-apple-system,sans-serif; background: #f0f7ff; color: #1e3a5f; min-height: 100vh; display: flex; justify-content: center; }
+#app { width: 100%; max-width: 480px; display: flex; flex-direction: column; min-height: 100vh; }
+
+header { background: linear-gradient(135deg,#1a6fba 0%,#2563eb 60%,#0ea5e9 100%); padding: 16px 14px 12px; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 16px #2563eb33; }
+.header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 36px; height: 36px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.logo-title { font-size: 14px; font-weight: 700; color: #fff; }
+.logo-status { font-size: 10px; color: rgba(255,255,255,0.8); margin-top: 1px; }
+.hbtns { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.btn-login { padding: 6px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.18); color: #fff; font-size: 11px; cursor: pointer; font-weight: 600; }
+.btn-sheets { padding: 6px 11px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.18); color: #fff; font-size: 11px; text-decoration: none; }
+.sbtn { padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.75); font-size: 10px; cursor: pointer; }
+.sbtn.active { background: rgba(255,255,255,0.25); color: #fff; border-color: rgba(255,255,255,0.7); }
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-bottom: 8px; }
+.stat-btn { border-radius: 10px; padding: 9px 4px; text-align: center; cursor: pointer; border: none; background: rgba(255,255,255,0.15); }
+.snum { font-size: 22px; font-weight: 800; color: #fff; line-height: 1; }
+.slbl { font-size: 10px; color: rgba(255,255,255,0.8); margin-top: 2px; }
+.ebar { background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 10px; }
+.elbl { font-size: 11px; color: rgba(255,255,255,0.9); white-space: nowrap; }
+.etrack { flex: 1; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden; }
+.efill { height: 100%; border-radius: 3px; background: linear-gradient(90deg,#86efac,#22c55e); transition: width .4s; }
+.eval { font-size: 11px; color: #fff; font-weight: 700; white-space: nowrap; }
+
+.tabs { display: flex; background: #fff; border-bottom: 1px solid #dbeafe; flex-shrink: 0; box-shadow: 0 1px 4px #2563eb11; }
+.tab { flex: 1; padding: 10px 0; background: transparent; border: none; border-bottom: 2px solid transparent; color: #94a3b8; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.tab.active { border-bottom-color: #2563eb; color: #2563eb; background: #f8fbff; }
+
+#tasks-panel { flex: 1; overflow: auto; padding: 10px 12px 80px; display: none; }
+#tasks-panel.vis { display: block; }
+#effort-panel { flex: 1; overflow: auto; padding: 10px 12px 80px; display: none; }
+#effort-panel.vis { display: block; }
+
+.filters { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.fbtn { padding: 4px 11px; border-radius: 20px; border: 1px solid #bfdbfe; background: #fff; color: #64748b; font-size: 11px; cursor: pointer; font-family: inherit; }
+.fbtn.active { border-color: #2563eb; background: #eff6ff; color: #2563eb; font-weight: 600; }
+
+.card { background: #fff; border: 1px solid #dbeafe; border-radius: 14px; padding: 13px 14px; margin-bottom: 10px; box-shadow: 0 2px 8px #2563eb0d; position: relative; transition: box-shadow .2s; }
+.card:hover { box-shadow: 0 4px 16px #2563eb18; }
+.card.done { opacity: .55; }
+.ctop { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 5px; }
+.ctitle { font-size: 13px; font-weight: 600; color: #1e3a5f; line-height: 1.4; flex: 1; }
+.ctitle.done { text-decoration: line-through; color: #94a3b8; }
+.ctitle-input { font-size: 13px; font-weight: 600; color: #1e3a5f; flex: 1; border: 1px solid #93c5fd; border-radius: 6px; padding: 2px 6px; outline: none; font-family: inherit; background: #eff6ff; width: 100%; }
+.sbadge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+.cdetail { font-size: 11px; color: #64748b; margin-bottom: 7px; line-height: 1.55; }
+.cdetail-input { font-size: 11px; color: #475569; margin-bottom: 7px; border: 1px solid #93c5fd; border-radius: 6px; padding: 4px 8px; width: 100%; outline: none; font-family: inherit; background: #eff6ff; resize: none; line-height: 1.5; }
+.cmeta { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; }
+.tag-blue { background: #dbeafe; color: #1d4ed8; }
+.mi { font-size: 10px; color: #64748b; }
+.mi-red { font-size: 10px; color: #ef4444; font-weight: 600; }
+.edit-btn { position: absolute; top: 10px; right: 10px; font-size: 10px; padding: 2px 8px; border-radius: 6px; border: 1px solid #dbeafe; background: #f8fbff; color: #3b82f6; cursor: pointer; font-family: inherit; opacity: 0; transition: opacity .15s; }
+.card:hover .edit-btn { opacity: 1; }
+.erow { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; align-items: center; }
+.esel { font-size: 11px; padding: 4px 7px; border-radius: 6px; border: 1px solid #93c5fd; background: #eff6ff; color: #1e3a5f; cursor: pointer; font-family: inherit; outline: none; }
+.einp { font-size: 11px; padding: 4px 7px; border-radius: 6px; border: 1px solid #93c5fd; background: #eff6ff; color: #1e3a5f; font-family: inherit; outline: none; }
+.btn-sv { font-size: 11px; padding: 4px 12px; border-radius: 6px; border: none; background: #2563eb; color: #fff; cursor: pointer; font-family: inherit; font-weight: 600; }
+.btn-cl { font-size: 11px; padding: 4px 9px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #64748b; cursor: pointer; font-family: inherit; }
+
+.esum { background: #fff; border: 1px solid #dbeafe; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 2px 8px #2563eb0d; }
+.esum-title { font-size: 11px; font-weight: 700; color: #2563eb; margin-bottom: 8px; }
+.egrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.eitem { text-align: center; background: #f8fbff; border-radius: 8px; padding: 8px 4px; }
+.enum { font-size: 18px; font-weight: 800; color: #1e3a5f; }
+.elabel { font-size: 10px; color: #64748b; margin-top: 2px; }
+.erow-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f7ff; }
+
+.empty { text-align: center; color: #94a3b8; padding: 48px 0; font-size: 14px; }
+
+#chat-panel { flex: 1; display: none; flex-direction: column; overflow: hidden; height: calc(100vh - 230px); }
+#chat-panel.vis { display: flex; }
+.msgs { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.msg { display: flex; }
+.msg.user { justify-content: flex-end; }
+.mavatar { width: 28px; height: 28px; background: linear-gradient(135deg,#2563eb,#0ea5e9); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-right: 8px; flex-shrink: 0; align-self: flex-end; }
+.mbubble { max-width: 80%; padding: 10px 14px; font-size: 13px; line-height: 1.65; white-space: pre-wrap; }
+.msg.user .mbubble { border-radius: 16px 16px 4px 16px; background: linear-gradient(135deg,#1d4ed8,#2563eb); color: #fff; }
+.msg.assistant .mbubble { border-radius: 16px 16px 16px 4px; background: #fff; color: #1e3a5f; border: 1px solid #dbeafe; box-shadow: 0 1px 4px #2563eb0d; }
+.typing { display: flex; gap: 5px; padding: 8px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #2563eb; animation: pulse 1.2s ease-in-out infinite; }
+.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+@keyframes pulse{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+.qactions { padding: 8px 12px 4px; display: flex; gap: 6px; overflow-x: auto; border-top: 1px solid #dbeafe; background: #f8fbff; }
+.qbtn { padding: 5px 10px; border-radius: 16px; border: 1px solid #bfdbfe; background: #fff; color: #2563eb; font-size: 11px; cursor: pointer; white-space: nowrap; font-family: inherit; flex-shrink: 0; }
+.iarea { padding: 8px 12px 20px; display: flex; gap: 8px; background: #f0f7ff; }
+textarea { flex: 1; padding: 10px 13px; border-radius: 12px; border: 1px solid #bfdbfe; background: #fff; color: #1e3a5f; font-size: 13px; outline: none; font-family: inherit; resize: none; line-height: 1.5; }
+textarea::placeholder { color: #94a3b8; }
+.sndbtn { width: 44px; height: 44px; border-radius: 12px; align-self: flex-end; background: #dbeafe; border: 1px solid #bfdbfe; color: #94a3b8; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: default; }
+.sndbtn.on { background: linear-gradient(135deg,#1d4ed8,#2563eb); border-color: #2563eb; color: #fff; cursor: pointer; box-shadow: 0 2px 8px #2563eb44; }
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#bfdbfe;border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">🦆</div>
+        <div>
+          <div class="logo-title">かものはし タスクAI</div>
+          <div class="logo-status" id="slabel">Sheets未接続</div>
+        </div>
+      </div>
+      <div class="hbtns">
+        <button class="btn-login" id="login-btn" onclick="connectSheets()">🔗 Googleログイン</button>
+        <a class="btn-sheets" id="sheets-link" href="#" target="_blank" style="display:none">📊 Sheets</a>
+        <button class="sbtn active" id="sd" onclick="setSortBy('due')">期限</button>
+        <button class="sbtn" id="sp" onclick="setSortBy('priority')">優先度</button>
+        <button class="sbtn" id="se" onclick="setSortBy('effort')">工数</button>
+      </div>
+    </div>
+    <div class="stats">
+      <button class="stat-btn" onclick="setFilter('未着手')"><div class="snum" id="c-todo">0</div><div class="slbl">未着手</div></button>
+      <button class="stat-btn" onclick="setFilter('進行中')"><div class="snum" id="c-wip">0</div><div class="slbl">進行中</div></button>
+      <button class="stat-btn" onclick="setFilter('完了')"><div class="snum" id="c-done">0</div><div class="slbl">完了</div></button>
+    </div>
+    <div class="ebar">
+      <span class="elbl">⏱ 残り工数</span>
+      <div class="etrack"><div class="efill" id="efill" style="width:0%"></div></div>
+      <span class="eval" id="etotal">0h</span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-tasks" onclick="showTab('tasks')">📋 タスク</button>
+    <button class="tab" id="tab-effort" onclick="showTab('effort')">⏱ 工数</button>
+    <button class="tab" id="tab-chat" onclick="showTab('chat')">🤖 AI更新</button>
+  </div>
+
+  <div id="tasks-panel" class="vis"><div class="filters">
+    <button class="fbtn active" id="f-all" onclick="setFilter('全て')">全て</button>
+    <button class="fbtn" id="f-todo" onclick="setFilter('未着手')">未着手</button>
+    <button class="fbtn" id="f-wip" onclick="setFilter('進行中')">進行中</button>
+    <button class="fbtn" id="f-done" onclick="setFilter('完了')">完了</button>
+  </div><div id="task-list"></div></div>
+
+  <div id="effort-panel"><div id="effort-content"></div></div>
+
+  <div id="chat-panel">
+    <div class="msgs" id="messages"></div>
+    <div class="qactions">
+      <button class="qbtn" onclick="si('JT竹中面談準備完了')">JT面談完了</button>
+      <button class="qbtn" onclick="si('AIチーム業務実装着手')">AI着手</button>
+      <button class="qbtn" onclick="si('法人寄付フィードバック完了')">寄付完了</button>
+      <button class="qbtn" onclick="si('新しいタスク追加：')">タスク追加</button>
+      <button class="qbtn" onclick="si('Zoomメモから抽出して：\n')">Zoomメモ→</button>
+    </div>
+    <div class="iarea">
+      <textarea id="ci" rows="2" placeholder="「〇〇完了」「追加：〇〇」「工数2hで〇〇追加」..." oninput="oic()" onkeydown="okd(event)"></textarea>
+      <button class="sndbtn" id="sbtn" onclick="send()">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CID="432840603328-ttapfb1bqoabbp5ql8orkifa3jhimfpr.apps.googleusercontent.com";
+const SID="1GXiC1IvMjxnO2iog5ETu6xb3Ek9jto95tVr4JSF1mqA";
+const SN="tasks";
+const HDR=["id","title","detail","source","sourceIcon","priority","status","due","tags","effort"];
+const SP=`You are a task assistant for Keisuke Motoki at かものはしプロジェクト. Return ONLY JSON (no markdown):
+{"action":"update_status"|"add_task"|"extract_tasks"|"update_priority"|"update_due"|"update_effort"|"reply","message":"Japanese response","updates":[{"id":number,"field":"status"|"priority"|"due"|"title"|"effort","value":string}],"newTasks":[{"title":string,"detail":string,"source":string,"sourceIcon":"📧"|"💬"|"📹","priority":"高"|"中"|"低","status":"未着手","due":"YYYY-MM-DD","tags":[string],"effort":number}]}
+Rules: 〇〇完了/終わった→status=完了, 〇〇着手→status=進行中, 追加：〇〇→add_task, Zoom/議事録→extract_tasks, 優先度を〇〇に→update_priority, 期限を〇〇に→update_due(4月10日→2026-04-10), 工数Nh→effort=N. タイトル部分一致. 返答は日本語.`;
+
+let tasks=[
+  {id:1,title:"JT竹中さんとのTeams面談準備",detail:"4/14(火) 14:15〜 Teams。近況共有・かものはし活動紹介。",source:"Gmail",sourceIcon:"📧",priority:"高",status:"未着手",due:"2026-04-14",tags:["外部連携","JT"],effort:1},
+  {id:2,title:"「紛争に関する勉強 番外編」Zoom参加",detail:"4/14(火) 14:00〜 坂上さん主催。藤村さんも参加予定。",source:"Gmail",sourceIcon:"📧",priority:"中",status:"未着手",due:"2026-04-14",tags:["勉強会","紛争"],effort:1},
+  {id:3,title:"Global survey相談 フォローアップ",detail:"五井渕さんと3/27にMTG実施済み。次のアクション確認が必要。",source:"Gmail",sourceIcon:"📧",priority:"中",status:"進行中",due:"2026-04-05",tags:["調査","グローバル"],effort:2},
+  {id:4,title:"ジャーナリスト情報提供件の方針確認",detail:"稲川さん・曽根原さんCc。警察庁との連携方針を組織として決定する必要あり。",source:"Gmail",sourceIcon:"📧",priority:"高",status:"進行中",due:"2026-04-02",tags:["対外連携","警察庁"],effort:2},
+  {id:5,title:"AIチーム：業務実装方針レビュー＆フィードバック",detail:"小俣さんより依頼。AI最新情報キャッチアップ→業務実装検討。期日4/17。",source:"Slack #特命AIチーム",sourceIcon:"💬",priority:"高",status:"未着手",due:"2026-04-17",tags:["AI活用","組織"],effort:3},
+  {id:6,title:"法人寄付・使途指定の提案内容フィードバック",detail:"青山さんより。横浜ゴム60万円寄付案件。各事業部パターンで提案作成中。",source:"Slack #組織横断ファンドレイジング",sourceIcon:"💬",priority:"高",status:"未着手",due:"2026-04-17",tags:["ファンドレイジング","寄付"],effort:2},
+  {id:7,title:"HS参加者候補への声がけ協力",detail:"三代さんより。今週から主催団体各自で積極的な声がけ実施中。",source:"Slack #hs-global関連",sourceIcon:"💬",priority:"中",status:"未着手",due:"2026-04-03",tags:["HS","国際"],effort:1},
+  {id:8,title:"英語発音レッスン受講（ストアカ）",detail:"3/29(日)21:00〜 井上陽子さん。3/30(月)20:00〜 別レッスン予約済み。",source:"Gmail",sourceIcon:"📧",priority:"低",status:"完了",due:"2026-03-30",tags:["英語","自己研鑽"],effort:1},
+];
+let gToken=null,sortBy="due",filter="全て",nextId=tasks.length+1,loading=false,tc=null,editId=null;
+const SC={"未着手":"#3b82f6","進行中":"#f59e0b","完了":"#22c55e"};
+const SBG={"未着手":"#eff6ff","進行中":"#fffbeb","完了":"#f0fdf4"};
+const PC={"高":"#ef4444","中":"#f59e0b","低":"#94a3b8"};
+const PBG={"高":"#fee2e2","中":"#fffbeb","低":"#f1f5f9"};
+const today=new Date().toISOString().split("T")[0];
+
+window.addEventListener('load',()=>{
+  if(window.google)ig();
+  else document.querySelector('script[src*="gsi"]').addEventListener('load',ig);
+  addMsg("assistant","こんにちは、恵介さん！\n\n「🔗 Googleログイン」でSheetsと接続できます。\n\nタスクカードにカーソルを当てると ✏️ 編集ボタンが出ます。優先度・タグ・工数を直接変更できます！");
+  ra();
+});
+function ig(){tc=google.accounts.oauth2.initTokenClient({client_id:CID,scope:"https://www.googleapis.com/auth/spreadsheets",callback:async r=>{if(r.error){ss("⚠ エラー");addMsg("assistant","⚠️ ログイン失敗。もう一度お試しください。");return;}gToken=r.access_token;ss("✓ 接続済み");document.getElementById("login-btn").style.display="none";const sl=document.getElementById("sheets-link");sl.style.display="inline-block";sl.href=`https://docs.google.com/spreadsheets/d/${SID}`;await lfs();}});}
+function connectSheets(){tc?.requestAccessToken();}
+function ss(l){document.getElementById("slabel").textContent=l;}
+async function lfs(){
+  try{
+    const r1=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${SN}!A1:J1`,{headers:{Authorization:`Bearer ${gToken}`}});
+    const h=await r1.json();
+    if(!h.values||h.values[0]?.[0]!=="id"){await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${SN}!A1:J1?valueInputOption=RAW`,{method:"PUT",headers:{Authorization:`Bearer ${gToken}`,"Content-Type":"application/json"},body:JSON.stringify({values:[HDR]})});}
+    const r2=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${SN}!A2:J1000`,{headers:{Authorization:`Bearer ${gToken}`}});
+    const d=await r2.json();
+    if(d.values&&d.values.length>0){const ld=d.values.map(r=>{if(!r||r.length<8)return null;try{return{id:parseInt(r[0]),title:r[1]||"",detail:r[2]||"",source:r[3]||"",sourceIcon:r[4]||"📋",priority:r[5]||"中",status:r[6]||"未着手",due:r[7]||"",tags:r[8]?JSON.parse(r[8]):[],effort:r[9]?parseFloat(r[9]):0};}catch{return null;}}).filter(Boolean);if(ld.length>0){tasks=ld;nextId=Math.max(...tasks.map(t=>t.id))+1;ra();addMsg("assistant",`✅ Sheetsから${ld.length}件を読み込みました！`);return;}}
+    await sts(tasks);addMsg("assistant",`✅ Sheetsに${tasks.length}件を保存しました！`);
+  }catch(e){ss("⚠ エラー");addMsg("assistant","⚠️ Sheets接続エラー: "+e.message);}
+}
+async function sts(tl){
+  if(!gToken)return;ss("同期中...");
+  try{
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${SN}!A2:J1000:clear`,{method:"POST",headers:{Authorization:`Bearer ${gToken}`}});
+    if(!tl.length){ss("✓ 同期済み");return;}
+    const rows=tl.map(t=>[t.id,t.title,t.detail||"",t.source||"",t.sourceIcon||"📋",t.priority||"中",t.status||"未着手",t.due||"",JSON.stringify(t.tags||[]),t.effort||0]);
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${SN}!A2:J${rows.length+1}?valueInputOption=RAW`,{method:"PUT",headers:{Authorization:`Bearer ${gToken}`,"Content-Type":"application/json"},body:JSON.stringify({values:rows})});
+    ss("✓ 同期 "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));
+  }catch{ss("⚠ 同期エラー");}
+}
+
+function ra(){rt();re();uh();}
+function uh(){
+  const c={未着手:0,進行中:0,完了:0};tasks.forEach(t=>c[t.status]=(c[t.status]||0)+1);
+  document.getElementById("c-todo").textContent=c["未着手"]||0;
+  document.getElementById("c-wip").textContent=c["進行中"]||0;
+  document.getElementById("c-done").textContent=c["完了"]||0;
+  const rem=tasks.filter(t=>t.status!=="完了").reduce((s,t)=>s+(t.effort||0),0);
+  const don=tasks.filter(t=>t.status==="完了").reduce((s,t)=>s+(t.effort||0),0);
+  const tot=rem+don;
+  document.getElementById("etotal").textContent=rem+"h残";
+  document.getElementById("efill").style.width=tot>0?(don/tot*100)+"%":"0%";
+}
+function rt(){
+  uh();
+  const f=tasks.filter(t=>filter==="全て"||t.status===filter).sort((a,b)=>{
+    if(sortBy==="due")return a.due.localeCompare(b.due);
+    if(sortBy==="priority")return({高:0,中:1,低:2}[a.priority]||1)-({高:0,中:1,低:2}[b.priority]||1);
+    return(b.effort||0)-(a.effort||0);
+  });
+  const el=document.getElementById("task-list");
+  if(!f.length){el.innerHTML='<div class="empty"><div style="font-size:36px;margin-bottom:8px">✓</div>タスクはありません</div>';return;}
+  el.innerHTML=f.map(rc).join('');
+}
+function rc(t){
+  const ed=editId===t.id;
+  const ov=t.due<today&&t.status!=="完了";
+  return `<div class="card ${t.status==='完了'?'done':''}" id="card-${t.id}" style="border-left:3px solid ${PC[t.priority]}">
+    ${!ed?`<button class="edit-btn" onclick="startEdit(${t.id})">✏️ 編集</button>`:''}
+    <div class="ctop">
+      ${ed?`<input class="ctitle-input" id="et-${t.id}" value="${e(t.title)}">`:`<div class="ctitle ${t.status==='完了'?'done':''}">${t.sourceIcon||''} ${e(t.title)}</div>`}
+      <span class="sbadge" style="background:${SBG[t.status]};color:${SC[t.status]};border:1px solid ${SC[t.status]}44">${t.status}</span>
+    </div>
+    ${ed?`<textarea class="cdetail-input" id="ed-${t.id}" rows="2">${e(t.detail||'')}</textarea>`:(t.detail?`<div class="cdetail">${e(t.detail)}</div>`:'')}
+    ${ed?`
+      <div class="erow">
+        <select class="esel" id="es-${t.id}">${['未着手','進行中','完了'].map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('')}</select>
+        <select class="esel" id="ep-${t.id}">${['高','中','低'].map(p=>`<option ${p===t.priority?'selected':''}>${p}</option>`).join('')}</select>
+        <input class="einp" type="date" id="edu-${t.id}" value="${t.due}" style="width:120px">
+        <input class="einp" type="number" id="ef-${t.id}" value="${t.effort||0}" min="0" step="0.5" placeholder="工数h" style="width:70px">
+      </div>
+      <div class="erow" style="margin-top:4px">
+        <input class="einp" style="flex:1;width:100%" id="etag-${t.id}" value="${e((t.tags||[]).join(', '))}" placeholder="タグ（カンマ区切り）">
+      </div>
+      <div class="erow" style="margin-top:6px">
+        <button class="btn-sv" onclick="sv(${t.id})">✓ 保存</button>
+        <button class="btn-cl" onclick="ce()">キャンセル</button>
+      </div>`
+    :`<div class="cmeta">
+        <span class="tag" style="background:${PBG[t.priority]};color:${PC[t.priority]};border:1px solid ${PC[t.priority]}33">▲ ${t.priority}</span>
+        <span class="${ov?'mi-red':'mi'}">${ov?'⚠':'📅'} ${t.due}</span>
+        <span class="mi">⏱ ${t.effort||0}h</span>
+        <span class="mi">${e(t.source||'')}</span>
+        ${(t.tags||[]).map(tag=>`<span class="tag tag-blue">#${e(tag)}</span>`).join('')}
+      </div>`}
+  </div>`;
+}
+function startEdit(id){editId=id;rt();}
+function ce(){editId=null;rt();}
+function sv(id){
+  const t=tasks.find(t=>t.id===id);if(!t)return;
+  t.title=document.getElementById(`et-${id}`).value.trim()||t.title;
+  t.detail=document.getElementById(`ed-${id}`).value.trim();
+  t.status=document.getElementById(`es-${id}`).value;
+  t.priority=document.getElementById(`ep-${id}`).value;
+  t.due=document.getElementById(`edu-${id}`).value;
+  t.effort=parseFloat(document.getElementById(`ef-${id}`).value)||0;
+  t.tags=document.getElementById(`etag-${id}`).value.split(',').map(s=>s.trim()).filter(Boolean);
+  editId=null;ra();sts(tasks);
+}
+function re(){
+  const active=tasks.filter(t=>t.status!=="完了");
+  const done=tasks.filter(t=>t.status==="完了");
+  const ta=active.reduce((s,t)=>s+(t.effort||0),0);
+  const td=done.reduce((s,t)=>s+(t.effort||0),0);
+  const bp={高:0,中:0,低:0};active.forEach(t=>bp[t.priority]=(bp[t.priority]||0)+(t.effort||0));
+  document.getElementById("effort-content").innerHTML=`
+    <div class="esum">
+      <div class="esum-title">📊 工数サマリー</div>
+      <div class="egrid">
+        <div class="eitem"><div class="enum" style="color:#2563eb">${ta}h</div><div class="elabel">残り工数</div></div>
+        <div class="eitem"><div class="enum" style="color:#22c55e">${td}h</div><div class="elabel">完了済み</div></div>
+        <div class="eitem"><div class="enum" style="color:#1e3a5f">${ta+td}h</div><div class="elabel">合計</div></div>
+      </div>
+    </div>
+    <div class="esum">
+      <div class="esum-title">🎯 優先度別 残り工数</div>
+      <div class="egrid">
+        <div class="eitem"><div class="enum" style="color:#ef4444">${bp['高']}h</div><div class="elabel">高優先度</div></div>
+        <div class="eitem"><div class="enum" style="color:#f59e0b">${bp['中']}h</div><div class="elabel">中優先度</div></div>
+        <div class="eitem"><div class="enum" style="color:#94a3b8">${bp['低']}h</div><div class="elabel">低優先度</div></div>
+      </div>
+    </div>
+    <div class="esum">
+      <div class="esum-title">📋 タスク別工数</div>
+      ${tasks.filter(t=>(t.effort||0)>0).sort((a,b)=>(b.effort||0)-(a.effort||0)).map(t=>`
+        <div class="erow-item">
+          <div style="flex:1;font-size:12px;color:${t.status==='完了'?'#94a3b8':'#1e3a5f'};${t.status==='完了'?'text-decoration:line-through':''}">
+            ${t.sourceIcon} ${e(t.title)}
+          </div>
+          <span style="font-size:11px;font-weight:700;color:${t.status==='完了'?'#22c55e':'#2563eb'};white-space:nowrap">${t.effort}h</span>
+          <span class="tag" style="background:${SBG[t.status]};color:${SC[t.status]};border:1px solid ${SC[t.status]}33">${t.status}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function e(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function showTab(tab){
+  ['tasks','effort','chat'].forEach(id=>{
+    const p=document.getElementById(id+'-panel');
+    if(!p)return;
+    if(id==='chat'){p.style.display='none';p.className=''}
+    else{p.style.display='none';p.className=id+'-panel';}
+    document.getElementById('tab-'+id).className='tab';
+  });
+  const ap=document.getElementById(tab+'-panel');
+  if(tab==='chat'){ap.style.display='flex';ap.className='vis';}
+  else{ap.style.display='block';ap.className=tab+'-panel vis';}
+  document.getElementById('tab-'+tab).className='tab active';
+  if(tab==='effort')re();
+}
+function setFilter(f){filter=f;['all','todo','wip','done'].forEach(k=>{const m={all:'全て',todo:'未着手',wip:'進行中',done:'完了'};document.getElementById('f-'+k).className='fbtn'+(m[k]===f?' active':'');});rt();}
+function setSortBy(s){sortBy=s;['due','priority','effort'].forEach(k=>{document.getElementById('s'+k[0]).className='sbtn'+(k===s?' active':'');});rt();}
+function addMsg(role,text){const el=document.getElementById('messages');const d=document.createElement('div');d.className='msg '+role;d.innerHTML=role==='assistant'?`<div class="mavatar">🦆</div><div class="mbubble">${e(text)}</div>`:`<div class="mbubble">${e(text)}</div>`;el.appendChild(d);el.scrollTop=el.scrollHeight;}
+function sht(){const el=document.getElementById('messages');const d=document.createElement('div');d.className='msg assistant';d.id='typ';d.innerHTML=`<div class="mavatar">🦆</div><div class="mbubble"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;el.appendChild(d);el.scrollTop=el.scrollHeight;}
+function hht(){document.getElementById('typ')?.remove();}
+function si(t){const el=document.getElementById('ci');el.value=t;el.focus();oic();showTab('chat');}
+function oic(){document.getElementById('sbtn').className='sndbtn'+(document.getElementById('ci').value.trim()?' on':'');}
+function okd(ev){if(ev.key==='Enter'&&!ev.shiftKey&&!ev.isComposing){ev.preventDefault();send();}}
+async function send(){
+  const el=document.getElementById('ci');const txt=el.value.trim();if(!txt||loading)return;
+  el.value='';oic();loading=true;addMsg('user',txt);sht();
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:SP,messages:[{role:'user',content:`Tasks:\n${JSON.stringify(tasks)}\n\nUser: ${txt}`}]})});
+    const d=await r.json();const raw=d.content?.find(b=>b.type==='text')?.text||'{}';
+    let p;try{p=JSON.parse(raw.replace(/```json\n?|```\n?/g,'').trim());}catch{p={message:'処理できませんでした。',updates:[],newTasks:[]};}
+    if(p.updates?.length)tasks=tasks.map(t=>{const u=p.updates.find(u=>u.id===t.id);return u?{...t,[u.field]:u.field==='effort'?parseFloat(u.value)||0:u.value}:t;});
+    if(p.newTasks?.length)tasks=[...tasks,...p.newTasks.map(nt=>({...nt,id:nextId++,effort:nt.effort||0}))];
+    ra();hht();addMsg('assistant',p.message||'完了！');
+    if(gToken&&(p.updates?.length||p.newTasks?.length))await sts(tasks);
+    if(p.action!=='reply')setTimeout(()=>showTab('tasks'),900);
+  }catch{hht();addMsg('assistant','エラーが発生しました。もう一度お試しください。');}
+  loading=false;
+}
+</script>
+</body>
+</html>
